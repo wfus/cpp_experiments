@@ -8,6 +8,7 @@
 #include <vector>
 #include <stack>
 #include <queue>
+#include <set>
 #include <tuple>
 
 /**
@@ -62,11 +63,10 @@ bool sim_rod_percolation(int N, double L) {
 		return uniform_angle(mersenne_engine);
 	};
 
-
 	std::vector<double> xlocs(N), ylocs(N), angles(N);
 	std::vector<Point> start_points, end_points;
-	
-	generate(begin(xlocs), end(ylocs), loc_gen);
+
+	generate(begin(xlocs), end(xlocs), loc_gen);
 	generate(begin(ylocs), end(ylocs), loc_gen);
 	generate(begin(angles), end(angles), angle_gen);
 
@@ -75,6 +75,64 @@ bool sim_rod_percolation(int N, double L) {
 		double xloc = xlocs[idx];
 		double yloc = ylocs[idx];
 		double angle = angles[idx];
+		double dx = L * std::cos(angle);
+		double dy = L * std::sin(angle);
+
+		Point start_point, end_point;
+		start_point.x = xloc - dx;
+		end_point.x = xloc + dx;
+		start_point.y = yloc - dy;
+		end_point.y = yloc + dy;
+
+		start_points.push_back(start_point);
+		end_points.push_back(end_point);
+	}
+
+	std::vector<std::vector<int>> connections(N, std::vector<int>({}));
+	// Find out which rods are connected to each other.
+	Point start_a, start_b, end_a, end_b;
+	for (int a = 0; a < N; a++) {
+		for (int b = 0; b < N; b++) {
+			start_a = start_points[a];
+			end_a = end_points[a];
+			start_b = start_points[b];
+			end_b = end_points[b];
+			if (intersect(start_a, end_a, start_b, end_b)) {
+				connections[a].push_back(b);
+			}
+		}
+	}
+
+	std::vector<int> source_idxs;
+	std::set<int> sink_idxs;
+	for (int i = 0; i < start_points.size(); i++) {
+		start_a = start_points[i];
+		end_a = end_points[i];
+		if (start_a.x < 0 || end_a.x < 0) {
+			source_idxs.push_back(i);	
+		} else if (start_a.x > 1. || end_a.x > 1.) {
+			sink_idxs.insert(i);	
+		}
+	}
+
+	for (int start_idx: source_idxs) {
+		std::queue<int> q;
+		std::set<int> seen;
+		q.push(start_idx);
+
+		while (!q.empty()) {
+			int curr = q.front();
+			q.pop();
+			if (seen.count(curr) < 1) {
+				seen.insert(curr);
+				if (sink_idxs.count(curr) > 0) {
+					return true;
+				}
+				for (int neighbor: connections[curr]) {
+					q.push(neighbor);
+				}
+			}
+		}
 	}
 	return false;
 }
@@ -146,22 +204,58 @@ bool sim_2d_site_percolation(int N, double prob) {
 
 
 	}
-	
-
 	return false;
 }
 
 
+template <typename T>
+std::vector<T> linspace(T a, T b, size_t N) {
+    T h = (b - a) / static_cast<T>(N-1);
+    std::vector<T> xs(N);
+    typename std::vector<T>::iterator x;
+    T val;
+    for (x = xs.begin(), val = a; x != xs.end(); ++x, val += h)
+        *x = val;
+    return xs;
+}
+
 
 int main(int argc, char** argv) {
 
-
-	// sim_rod_percolation(100, 0.1);
-
-
 	const int NUM_EXPERIMENTS = 100;
-	std::vector<double> probs({0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7,
-			0.8, 0.9, 1.0});
+
+	std::vector<double> n_choices = linspace(1.0, 100.0, 100);
+	std::vector<double> prob_choices = linspace(0.0, 1.0, 101);
+
+	for (int i = 0; i < n_choices.size(); i++)  {
+		for (int j = 0; j < prob_choices.size(); j++)  {
+			double n = n_choices[i];
+			double p = prob_choices[i];
+			int ctr = 0;
+
+			#pragma omp parallel for
+			for (int i = 0; i < NUM_EXPERIMENTS; i++) {
+				if (sim_rod_percolation(n, p)) {
+					ctr++;
+				}
+			}
+
+			// Output it as N,P,AVERAGE_SUCCESS.
+			double avg_success = (double) ctr / NUM_EXPERIMENTS;
+			std::cout << n << "," << 
+				p << "," << 
+				avg_success << std::endl;
+		}
+	}
+	
+	
+	
+	/*
+	const int NUM_EXPERIMENTS = 100;
+	std::vector<double> probs;
+	for (double prob = 0.40; prob < 0.55; prob += 0.005) {
+		probs.push_back(prob);
+	}
 		
 #pragma omp parallel for
 	for (int i = 0; i < probs.size(); i++) {
@@ -175,5 +269,7 @@ int main(int argc, char** argv) {
 		std::cout << "Prob: " << prob << ": " << (ctr / (float) NUM_EXPERIMENTS)
 			  << std::endl;
 	}
+	*/
 	return 0;
 }
+
