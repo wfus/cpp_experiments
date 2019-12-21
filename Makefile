@@ -1,9 +1,9 @@
 CXX=g++
-CXXFLAGS=-march=native -std=c++11
+CXXFLAGS=-march=native -std=c++11 -fopenmp -O3
 
 
 
-percolation:
+percolation: sim_site_percolation.cpp
 	$(CXX) $(CXXFLAGS) sim_site_percolation.cpp -o percolation 
 
 all: percolation
