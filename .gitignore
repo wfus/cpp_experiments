@@ -1,0 +1,10 @@
+# Cpp ignore
+a.out
+
+# Python
+*.pyc
+*__pycache__*
+
+# No ipython notebook
+*.ipynb
+*.ipynb*
